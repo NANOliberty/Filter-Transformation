@@ -143,6 +143,7 @@ python cartoonize.py a.jpg -s neon               # 한 장, 네온 스타일만
 | `PORT` | `5000` | 서버 포트 |
 | `HOST` | `127.0.0.1` | 바인딩 주소 |
 | `CARTOON_MAX_SIDE` | `1400` | 처리 해상도(긴 변). 낮추면 그만큼 빨라짐 |
+| `CARTOON_CONCURRENCY` | `1` | 브라우저가 한 번에 요청할 변환 수. 코어가 많으면 올림 |
 | `CARTOON_MAX_UPLOAD_MB` | `16` | 장당 업로드 용량 상한 |
 | `CARTOON_MAX_BATCH_FILES` | `40` | 일괄 변환에 한 번에 올릴 수 있는 장수 |
 | `CARTOON_MAX_AGE_SECONDS` | `3600` | 임시 파일 보관 시간 |

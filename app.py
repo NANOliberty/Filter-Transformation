@@ -13,7 +13,8 @@ import numpy as np
 from flask import (Flask, abort, jsonify, request, send_file, render_template,
                    url_for)
 
-from cartoon import STYLE_INFO, STYLES, apply_style, fit, normalize_colors
+from cartoon import (MAX_SIDE, STYLE_INFO, STYLES, apply_style, fit,
+                     normalize_colors)
 
 MAX_UPLOAD_MB = int(os.environ.get("CARTOON_MAX_UPLOAD_MB", "16"))
 MAX_AGE_SECONDS = int(os.environ.get("CARTOON_MAX_AGE_SECONDS", "3600"))
@@ -200,6 +201,44 @@ def index():
 @app.get("/healthz")
 def healthz():
     return jsonify(ok=True)
+
+
+@app.get("/api/speed")
+def speed():
+    """이 서버가 얼마나 빠른지 재서 알려준다.
+
+    배포한 곳이 느릴 때, 원인이 CPU인지 아닌지부터 가른다. 업로드 없이
+    고정된 그림을 만들어 돌리므로 결과를 서로 비교할 수 있다.
+    기준값은 코어 하나를 온전히 쓰는 기계에서 잰 것이다.
+    """
+    # 코어 하나를 온전히 쓰는 기계에서 600×600을 돌렸을 때의 값(ms)
+    reference = {"poster": 145, "oil": 125, "pencil": 25}
+
+    yy, xx = np.mgrid[0:600, 0:600].astype(np.float32)
+    board = np.stack([(xx * 0.4) % 256, (yy * 0.3) % 256,
+                      ((xx + yy) * 0.2) % 256], axis=-1).astype(np.uint8)
+    board = cv2.GaussianBlur(board, (0, 0), 1.5)
+
+    # 첫 회에는 메모리 확보 같은 준비 비용이 섞이므로 두 번 돌려 뒤엣것을 쓴다.
+    measured, total = {}, 0.0
+    for style in reference:
+        apply_style(board, style)
+        started = time.time()
+        apply_style(board, style)
+        ms = (time.time() - started) * 1000
+        measured[style] = round(ms)
+        total += ms
+
+    slowdown = total / sum(reference.values())
+    return jsonify(
+        측정=measured,
+        기준=reference,
+        합계ms=round(total),
+        배수=round(slowdown, 1),
+        판정=("빠름 — CPU는 문제가 아닙니다" if slowdown < 1.5 else
+              "보통 — 조금 느린 CPU입니다" if slowdown < 3 else
+              f"느림 — 기준의 {slowdown:.0f}배. CPU가 부족한 곳입니다"),
+        해상도=MAX_SIDE, 동시변환=CONCURRENCY)
 
 
 @app.post("/api/upload")

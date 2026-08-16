@@ -19,6 +19,7 @@
   var sourceName = $("#source-name");
   var sourceSize = $("#source-size");
   var colorsGroup = $("#colors");
+  var progressCount = $("#progress-count");
   var btnZip = $("#btn-zip");
   var btnReset = $("#btn-reset");
   var lightbox = $("#lightbox");
@@ -165,22 +166,33 @@
 
     list.forEach(function (style) { resetCard(cards[style]); });
     setBusy(true);
+    var done = 0;
+    showProgress(done, list.length);
 
     // CPU를 아끼려고 한 장씩 순서대로 처리한다.
     return list.reduce(function (chain, style) {
       return chain.then(function () {
         if (run !== state.run) return;
-        return transformOne(style, run);
+        return transformOne(style, run).then(function () {
+          if (run !== state.run) return;
+          showProgress(++done, list.length);
+        });
       });
     }, Promise.resolve()).then(function () {
       if (run === state.run) setBusy(false);
     });
   }
 
+  function showProgress(done, total) {
+    progressCount.textContent = done < total
+      ? done + " / " + total + " 변환 중…"
+      : "";
+  }
+
   function setBusy(busy) {
+    // 진행 상황은 옆의 카운터가 알려주므로 버튼 글씨는 그대로 둔다.
     state.busy = busy;
     btnZip.disabled = busy;
-    btnZip.textContent = busy ? "변환 중…" : "전체 다운로드";
   }
 
   // ------------------------------------------------------------ 이벤트
@@ -246,6 +258,7 @@
     state.run++;
     state.token = null;
     setBusy(false);
+    progressCount.textContent = "";
     Object.keys(cards).forEach(function (s) { resetCard(cards[s]); });
     workspace.hidden = true;
     uploader.hidden = false;

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>만화 필터 · 사진을 만화처럼</title>
+<meta name="description" content="사진을 올리면 네 가지 만화풍 스타일로 바꿔 줍니다.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎨</text></svg>">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <h1><span class="logo">🎨</span> 만화 필터</h1>
+    <p class="tagline">사진 한 장 올리면 네 가지 만화풍으로 뚝딱 바꿔 드려요.</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- 업로드 -->
+  <section id="uploader" class="uploader">
+    <label id="dropzone" class="dropzone" for="file-input" tabindex="0">
+      <div class="dz-emoji" aria-hidden="true">🖼️</div>
+      <p class="dz-title">여기로 사진을 끌어다 놓으세요</p>
+      <p class="dz-sub">클릭해서 고르거나 <kbd>Ctrl</kbd>+<kbd>V</kbd>로 붙여넣어도 돼요</p>
+      <p class="dz-hint">JPG · PNG · WEBP · BMP · TIFF · 최대 {{ max_upload_mb }}MB</p>
+      <input id="file-input" type="file" accept="image/*" hidden>
+    </label>
+    <p id="upload-error" class="error" hidden></p>
+    <div id="upload-progress" class="progress" hidden><span></span></div>
+  </section>
+
+  <!-- 작업 영역 -->
+  <section id="workspace" class="workspace" hidden>
+    <div class="toolbar">
+      <div class="source">
+        <img id="source-thumb" alt="원본 미리보기">
+        <div class="source-meta">
+          <strong id="source-name">—</strong>
+          <span id="source-size" class="muted"></span>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="control">
+          <span class="control-label">색상 수</span>
+          <div id="colors" class="segmented" role="group" aria-label="색상 수 선택">
+            <button type="button" data-colors="0" class="on">자동</button>
+            <button type="button" data-colors="6">적게</button>
+            <button type="button" data-colors="10">보통</button>
+            <button type="button" data-colors="16">많이</button>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="btn-zip" type="button" class="btn btn-primary">전체 다운로드</button>
+          <button id="btn-reset" type="button" class="btn">새 이미지</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      {% for s in styles %}
+      <article class="card" data-style="{{ s.key }}" data-tunable="{{ 1 if s.tunable else 0 }}">
+        <div class="frame">
+          <img class="result" alt="{{ s.label }} 스타일 결과" hidden>
+          <div class="state state-wait">대기 중</div>
+          <button type="button" class="zoom" hidden aria-label="크게 보기">⤢</button>
+        </div>
+        <div class="card-foot">
+          <div>
+            <strong>{{ s.label }}</strong>
+            <p class="muted">{{ s.desc }}</p>
+          </div>
+          <a class="btn btn-sm download" hidden download>저장</a>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+</main>
+
+<!-- 확대 보기 -->
+<div id="lightbox" class="lightbox" hidden>
+  <button type="button" class="lb-close" aria-label="닫기">✕</button>
+  <img id="lightbox-img" alt="확대 보기">
+  <p id="lightbox-cap" class="lb-cap"></p>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p>업로드한 이미지는 서버에 잠깐만 보관되고 한 시간 뒤 자동으로 지워집니다.</p>
+  </div>
+</footer>
+
+<script>
+  window.APP_CONFIG = {
+    maxUploadMb: {{ max_upload_mb }},
+    styles: {{ styles | tojson }}
+  };
+</script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

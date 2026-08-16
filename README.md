@@ -116,6 +116,19 @@ python cartoonize.py photos/ -o out/ -s all      # 열 스타일 전부
 python cartoonize.py a.jpg -s neon               # 한 장, 네온 스타일만
 ```
 
+## 다크 모드
+
+화면 오른쪽 위에서 **자동 · ☀ · 🌙** 중에 고릅니다.
+
+- **자동**(기본): 운영체제 설정(`prefers-color-scheme`)을 따라갑니다.
+- 직접 고른 값은 `localStorage`에 남아 다음 방문에도 유지되고, 시스템 설정을 이깁니다.
+- 첫 화면이 번쩍이지 않도록 `<head>`의 짧은 스크립트가 스타일시트보다 먼저
+  `data-theme`을 확정합니다.
+
+색은 전부 CSS 변수로만 씁니다. `style.css` 맨 위 토큰 세 벌(`:root`,
+`@media (prefers-color-scheme: dark)`, `:root[data-theme="dark"]`)의 값만
+바꾸면 되고, 개별 규칙에는 색을 직접 적지 않습니다.
+
 ## 설정 (환경변수)
 
 | 변수 | 기본값 | 설명 |

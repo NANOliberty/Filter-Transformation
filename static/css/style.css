@@ -1,18 +1,132 @@
+/* 색은 전부 여기 토큰으로만 쓴다. 다크 모드는 값만 갈아 끼우면 된다. */
 :root {
+  color-scheme: light;
+
   --bg: #fff8f0;
   --bg-tint: #ffeede;
   --card: #ffffff;
   --ink: #2f2a26;
   --muted: #8a7f75;
   --line: #f0e2d2;
+  --line-hover: #ffcdb6;
+
   --accent: #ff7a4d;
-  --accent-soft: #ffe6dc;
+  --accent-strong: #f96a3a;    /* 기본 버튼 호버 */
+  --accent-soft: #ffe6dc;      /* 옅은 강조 배경 */
+  --accent-fade: #ffb38f;      /* 진행 막대 그라데이션 끝 */
+  --accent-ink: #d2522a;       /* 옅은 배경 위 강조 글씨 */
+  --on-accent: #ffffff;        /* 강조색 위에 얹는 글씨 */
   --accent-2: #4fb6a5;
+
+  --glow-1: #ffe1cf;           /* 배경 은은한 빛 */
+  --glow-2: #d9f2ec;
+
+  --danger-bg: #ffe9e4;
+  --danger-line: #ffc3b4;
+  --danger-ink: #b23c1e;
+  --spinner-track: #ffd6c3;
+
+  --seg-on: #ffffff;           /* 세그먼트에서 선택된 칸 */
+  --glass: rgba(255, 255, 255, .9);
+  --glass-strong: #ffffff;
+  --overlay: rgba(47, 42, 38, .82);
+  --overlay-btn: rgba(255, 255, 255, .16);
+  --overlay-btn-hover: rgba(255, 255, 255, .3);
+  --overlay-ink: #ffffff;
+
   --shadow: 0 10px 24px rgba(90, 60, 40, .08);
+  --shadow-sm: 0 2px 6px rgba(90, 60, 40, .16);
+  --shadow-inset: 0 1px 4px rgba(90, 60, 40, .12);
   --radius: 18px;
 }
 
+/* 시스템 설정이 어두울 때. 사용자가 밝게를 고르면 적용하지 않는다. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #17130f;
+    --bg-tint: #251d17;
+    --card: #201a15;
+    --ink: #f2e8de;
+    --muted: #a2938a;
+    --line: #372e27;
+    --line-hover: #5b473a;
+
+    --accent: #ff8a5c;
+    --accent-strong: #ff9e77;
+    --accent-soft: #3a2318;
+    --accent-fade: #a85a35;
+    --accent-ink: #ffb190;
+    --on-accent: #241610;
+    --accent-2: #5cc7b4;
+
+    --glow-1: #2d1a10;
+    --glow-2: #11302c;
+
+    --danger-bg: #3b1d16;
+    --danger-line: #6d3627;
+    --danger-ink: #ffa286;
+    --spinner-track: #4d3527;
+
+    --seg-on: #3d322a;
+    --glass: rgba(26, 20, 16, .85);
+    --glass-strong: #1a1410;
+    --overlay: rgba(8, 6, 5, .88);
+    --overlay-btn: rgba(255, 255, 255, .14);
+    --overlay-btn-hover: rgba(255, 255, 255, .26);
+
+    --shadow: 0 10px 26px rgba(0, 0, 0, .45);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, .5);
+    --shadow-inset: 0 1px 4px rgba(0, 0, 0, .5);
+  }
+}
+
+/* 사용자가 직접 어둡게를 고른 경우 — 시스템 설정을 이긴다. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #17130f;
+  --bg-tint: #251d17;
+  --card: #201a15;
+  --ink: #f2e8de;
+  --muted: #a2938a;
+  --line: #372e27;
+  --line-hover: #5b473a;
+
+  --accent: #ff8a5c;
+  --accent-strong: #ff9e77;
+  --accent-soft: #3a2318;
+  --accent-fade: #a85a35;
+  --accent-ink: #ffb190;
+  --on-accent: #241610;
+  --accent-2: #5cc7b4;
+
+  --glow-1: #2d1a10;
+  --glow-2: #11302c;
+
+  --danger-bg: #3b1d16;
+  --danger-line: #6d3627;
+  --danger-ink: #ffa286;
+  --spinner-track: #4d3527;
+
+  --seg-on: #3d322a;
+  --glass: rgba(26, 20, 16, .85);
+  --glass-strong: #1a1410;
+  --overlay: rgba(8, 6, 5, .88);
+  --overlay-btn: rgba(255, 255, 255, .14);
+  --overlay-btn-hover: rgba(255, 255, 255, .26);
+
+  --shadow: 0 10px 26px rgba(0, 0, 0, .45);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, .5);
+  --shadow-inset: 0 1px 4px rgba(0, 0, 0, .5);
+}
+
 * { box-sizing: border-box; }
+
+/* 테마를 바꾸는 찰나에는 전환 효과를 끈다. 배경만 먼저 바뀌고 글씨는
+   그대로라 잠깐 글씨가 묻히는 것을 막는다. */
+.no-transition, .no-transition * { transition: none !important; }
 
 /* display를 직접 지정한 요소도 hidden 속성을 지키게 한다. */
 [hidden] { display: none !important; }
@@ -21,8 +135,8 @@ html, body { margin: 0; padding: 0; }
 
 body {
   background:
-    radial-gradient(900px 500px at 12% -10%, #ffe1cf 0%, transparent 60%),
-    radial-gradient(800px 500px at 95% 0%, #d9f2ec 0%, transparent 55%),
+    radial-gradient(900px 500px at 12% -10%, var(--glow-1) 0%, transparent 60%),
+    radial-gradient(800px 500px at 95% 0%, var(--glow-2) 0%, transparent 55%),
     var(--bg);
   color: var(--ink);
   font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR",
@@ -39,6 +153,16 @@ body {
 /* ------------------------------------------------------------ 헤더/푸터 */
 
 .site-header { padding: 44px 0 28px; text-align: center; }
+
+.site-header .wrap { position: relative; }
+
+.theme {
+  position: absolute;
+  top: -12px;
+  right: 20px;
+}
+
+.theme button { padding: 6px 11px; font-size: 13px; }
 
 .site-header h1 {
   margin: 0;
@@ -84,7 +208,7 @@ body {
   transition: border-color .15s, background .15s, transform .1s;
 }
 
-.mode:hover { border-color: #ffcdb6; transform: translateY(-1px); }
+.mode:hover { border-color: var(--line-hover); transform: translateY(-1px); }
 
 .mode strong { font-size: 15px; }
 .mode span { font-size: 12.5px; color: var(--muted); }
@@ -94,7 +218,7 @@ body {
   background: var(--accent-soft);
 }
 
-.mode.on strong { color: #d2522a; }
+.mode.on strong { color: var(--accent-ink); }
 
 /* ------------------------------------------------------------ 업로드 */
 
@@ -103,7 +227,7 @@ body {
 .dropzone {
   display: block;
   background: var(--card);
-  border: 2px dashed #ffcdb6;
+  border: 2px dashed var(--line-hover);
   border-radius: 24px;
   padding: 52px 24px;
   text-align: center;
@@ -140,9 +264,9 @@ kbd {
 
 .error {
   margin: 14px 0 0;
-  background: #ffe9e4;
-  border: 1px solid #ffc3b4;
-  color: #b23c1e;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-line);
+  color: var(--danger-ink);
   border-radius: 12px;
   padding: 12px 14px;
   font-size: 14px;
@@ -161,7 +285,7 @@ kbd {
   height: 100%;
   width: 30%;
   border-radius: 99px;
-  background: linear-gradient(90deg, var(--accent), #ffb38f);
+  background: linear-gradient(90deg, var(--accent), var(--accent-fade));
   animation: slide 1.1s ease-in-out infinite;
 }
 
@@ -238,10 +362,10 @@ kbd {
 .segmented button:hover { color: var(--ink); }
 
 .segmented button.on {
-  background: var(--card);
+  background: var(--seg-on);
   color: var(--accent);
   font-weight: 700;
-  box-shadow: 0 1px 4px rgba(90, 60, 40, .12);
+  box-shadow: var(--shadow-inset);
 }
 
 .actions { display: flex; gap: 8px; align-items: center; }
@@ -268,16 +392,16 @@ kbd {
   transition: background .15s, border-color .15s, transform .1s;
 }
 
-.btn:hover { background: var(--bg-tint); border-color: #ffcdb6; }
+.btn:hover { background: var(--bg-tint); border-color: var(--line-hover); }
 .btn:active { transform: translateY(1px); }
 
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
-.btn-primary:hover { background: #f96a3a; border-color: #f96a3a; }
+.btn-primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
 
 .btn-primary[disabled] {
   opacity: .5;
@@ -301,7 +425,7 @@ kbd {
   color: var(--ink);
 }
 
-.pseudo-btn:hover { background: #ffe0ce; border-color: #ffcdb6; }
+.pseudo-btn:hover { background: var(--accent-soft); border-color: var(--line-hover); }
 
 /* 사진을 고르고 나면 드롭존이 자리를 덜 차지하게 접는다. */
 .dropzone.compact { padding: 18px 20px; }
@@ -339,7 +463,7 @@ kbd {
   border-radius: 10px;
   border: 2px solid var(--card);
   background: var(--bg-tint);
-  box-shadow: 0 2px 6px rgba(90, 60, 40, .16);
+  box-shadow: var(--shadow-sm);
 }
 
 .stack img:nth-child(1) { left: 0;    top: 6px; }
@@ -390,12 +514,12 @@ kbd {
   transition: background .15s, color .15s, border-color .15s;
 }
 
-.chip:hover { color: var(--ink); border-color: #ffcdb6; }
+.chip:hover { color: var(--ink); border-color: var(--line-hover); }
 
 .chip.on {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .batch-grid .frame { aspect-ratio: 1 / 1; }
@@ -469,7 +593,7 @@ kbd {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  border: 3px solid #ffd6c3;
+  border: 3px solid var(--spinner-track);
   border-top-color: var(--accent);
   animation: spin .8s linear infinite;
   margin-bottom: 34px;
@@ -479,7 +603,7 @@ kbd {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.state.failed { color: #b23c1e; }
+.state.failed { color: var(--danger-ink); }
 
 .zoom {
   position: absolute;
@@ -489,14 +613,14 @@ kbd {
   height: 34px;
   border-radius: 10px;
   border: 0;
-  background: rgba(255, 255, 255, .9);
+  background: var(--glass);
   color: var(--ink);
   font-size: 15px;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, .16);
 }
 
-.zoom:hover { background: #fff; }
+.zoom:hover { background: var(--glass-strong); }
 
 .card-foot {
   display: flex;
@@ -514,7 +638,7 @@ kbd {
 .lightbox {
   position: fixed;
   inset: 0;
-  background: rgba(47, 42, 38, .82);
+  background: var(--overlay);
   display: grid;
   place-items: center;
   padding: 28px;
@@ -529,7 +653,7 @@ kbd {
 }
 
 .lb-cap {
-  color: #fff;
+  color: var(--overlay-ink);
   margin: 14px 0 0;
   font-size: 14px;
   text-align: center;
@@ -543,15 +667,17 @@ kbd {
   height: 40px;
   border: 0;
   border-radius: 12px;
-  background: rgba(255, 255, 255, .16);
-  color: #fff;
+  background: var(--overlay-btn);
+  color: var(--overlay-ink);
   font-size: 17px;
   cursor: pointer;
 }
 
-.lb-close:hover { background: rgba(255, 255, 255, .3); }
+.lb-close:hover { background: var(--overlay-btn-hover); }
 
 @media (max-width: 640px) {
+  .theme { position: static; margin: 0 auto 14px; display: inline-flex; }
+  .site-header { padding-top: 24px; }
   .toolbar { flex-direction: column; align-items: stretch; }
   .controls { justify-content: space-between; }
   .dropzone { padding: 38px 18px; }

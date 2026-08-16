@@ -5,13 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>만화 필터 · 사진을 만화처럼</title>
 <meta name="description" content="사진을 올리면 열 가지 만화풍 스타일로 바꿔 줍니다.">
+<meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎨</text></svg>">
+<script>
+  // 스타일시트보다 먼저 테마를 확정해 첫 화면이 번쩍이지 않게 한다.
+  (function () {
+    try {
+      var saved = localStorage.getItem("cartoon-theme");
+      if (saved === "light" || saved === "dark") {
+        document.documentElement.setAttribute("data-theme", saved);
+      }
+    } catch (e) { /* 저장소를 못 쓰면 시스템 설정을 따른다 */ }
+  })();
+</script>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
 <header class="site-header">
   <div class="wrap">
+    <div id="theme" class="segmented theme" role="group" aria-label="화면 테마">
+      <button type="button" data-theme="auto" title="시스템 설정 따라가기">자동</button>
+      <button type="button" data-theme="light" title="밝게" aria-label="밝게">☀</button>
+      <button type="button" data-theme="dark" title="어둡게" aria-label="어둡게">🌙</button>
+    </div>
     <h1><span class="logo">🎨</span> 만화 필터</h1>
     <p class="tagline">사진 한 장을 {{ styles | length }}가지로 비교하거나, 여러 장을 한 번에 바꿔 드려요.</p>
   </div>

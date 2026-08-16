@@ -70,6 +70,52 @@
     });
   }
 
+  // ------------------------------------------------------------ 테마
+
+  var THEME_KEY = "cartoon-theme";
+  var themeGroup = $("#theme");
+
+  function storedTheme() {
+    try {
+      var saved = localStorage.getItem(THEME_KEY);
+      return saved === "light" || saved === "dark" ? saved : "auto";
+    } catch (e) {
+      return "auto";
+    }
+  }
+
+  function applyTheme(mode) {
+    var root = document.documentElement;
+
+    // 색이 한 번에 갈리도록 전환 효과를 잠깐 끈다.
+    root.classList.add("no-transition");
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { root.classList.remove("no-transition"); });
+    });
+
+    // 자동이면 속성을 지워서 시스템 설정(prefers-color-scheme)에 맡긴다.
+    if (mode === "auto") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme", mode);
+
+    try {
+      if (mode === "auto") localStorage.removeItem(THEME_KEY);
+      else localStorage.setItem(THEME_KEY, mode);
+    } catch (e) { /* 저장 못 해도 이번 방문에는 적용된다 */ }
+
+    $$("button", themeGroup).forEach(function (b) {
+      var on = b.dataset.theme === mode;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
+  themeGroup.addEventListener("click", function (e) {
+    var btn = e.target.closest("button[data-theme]");
+    if (btn) applyTheme(btn.dataset.theme);
+  });
+
+  applyTheme(storedTheme());
+
   // ------------------------------------------------------------ 확대 보기
 
   var lightbox = $("#lightbox");

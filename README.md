@@ -149,19 +149,68 @@ python cartoonize.py a.jpg -s neon               # 한 장, 네온 스타일만
 
 ## 배포
 
-`python app.py`의 개발 서버 대신 gunicorn을 씁니다. 변환은 CPU를 오래 쓰므로
-타임아웃을 넉넉히 잡고, 워커 수는 코어 수에 맞춥니다.
+데이터베이스도, 외부 API 키도 없습니다. 파이썬이 도는 서버 한 대면 끝입니다.
+
+### 배포 전에 알아야 할 세 가지
+
+1. **인스턴스는 하나만.** 업로드한 원본과 변환 결과가 그 인스턴스의 로컬
+   디스크에 남습니다. 인스턴스를 둘로 늘리면 업로드를 받은 쪽과 변환을
+   요청받은 쪽이 달라져 "이미지가 만료되었습니다"가 뜹니다.
+   한 인스턴스 안에서 워커를 여러 개 두는 것은 괜찮습니다(디스크를 공유).
+   정말 여러 대로 늘려야 한다면 세션 고정을 켜거나 저장소를 S3로 빼야 합니다.
+2. **워커 하나가 변환 중 최대 300MB쯤 씁니다.** 램 512MB면 워커 1개,
+   1GB면 2개, 2GB면 4개가 적당합니다. 이보다 욕심내면 OOM으로 죽습니다.
+3. **타임아웃은 넉넉히.** 한 장을 열두 스타일로 바꾸는 데 8초 안팎이라
+   기본 30초로는 부족할 때가 있습니다. 180초를 권합니다.
+
+### 방법 1 — Render (가장 쉬움)
+
+저장소에 `render.yaml`이 있어 블루프린트로 바로 뜹니다.
+
+1. [render.com](https://render.com)에서 **New → Blueprint**
+2. 이 저장소를 고르면 `render.yaml`을 읽어 설정이 자동으로 채워집니다
+3. **Apply** — 첫 빌드에 3~5분
+
+`/healthz`가 헬스체크 경로로 잡혀 있어서, 뜨자마자 상태 확인이 됩니다.
+무료 플랜은 15분 놀면 잠들고 다음 요청에서 깨느라 30초쯤 걸립니다.
+
+### 방법 2 — Docker (Fly.io·Cloud Run·VPS 어디든)
 
 ```bash
-gunicorn -w 2 --threads 2 --timeout 120 -b 0.0.0.0:$PORT app:app
+docker build -t cartoon-filter .
+docker run -p 8000:8000 -e WEB_CONCURRENCY=2 cartoon-filter
+# http://localhost:8000
 ```
 
-Render·Railway·Fly 등에서는 저장소의 `Procfile`이 그대로 쓰입니다.
-`opencv-python-headless`를 쓰므로 GUI 라이브러리 없이도 설치됩니다.
+Fly.io라면:
+
+```bash
+fly launch --dockerfile Dockerfile   # 앱 이름·지역 선택
+fly deploy
+fly scale count 1                    # 인스턴스는 하나로
+fly scale memory 1024                # 워커 2개면 1GB
+```
+
+### 방법 3 — 그냥 서버 한 대에
+
+```bash
+git clone <저장소> && cd Filter-Transformation
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/gunicorn -w 2 --threads 2 --timeout 180 -b 0.0.0.0:8000 app:app
+```
+
+계속 떠 있게 하려면 systemd 유닛으로 감싸고, 앞에 nginx를 두어 443을 받습니다.
+`Procfile`도 그대로 있어서 Railway·Heroku 계열은 저장소만 연결하면 됩니다.
+
+### 공개하기 전에 확인할 것
+
+- `CARTOON_MAX_UPLOAD_MB`, `CARTOON_MAX_BATCH_FILES`를 감당할 값으로 낮추세요.
+  기본값(16MB × 40장)은 개인용 기준입니다.
+- 이 앱에는 로그인도 사용량 제한도 없습니다. 주소를 아는 사람은 누구나
+  CPU를 쓸 수 있으니, 공개 주소로 열 거면 앞단에 요청 수 제한을 두세요.
 
 ## 이미지 보관
 
 업로드한 원본과 변환 결과는 서버의 임시 디렉터리에만 저장되고,
 새 업로드가 들어올 때 한 시간이 지난 파일이 자동으로 삭제됩니다.
-컨테이너를 여러 개 띄우면 인스턴스마다 임시 파일이 따로 생기므로,
-같은 세션이 같은 인스턴스로 가도록 세션 고정을 켜거나 워커를 하나로 두세요.
+`CARTOON_MAX_AGE_SECONDS`로 보관 시간을, `CARTOON_WORKDIR`로 위치를 바꿉니다.

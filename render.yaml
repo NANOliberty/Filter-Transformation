@@ -1,0 +1,24 @@
+# Render 블루프린트. 저장소를 연결하면 이 설정대로 서비스가 만들어진다.
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: cartoon-filter
+    runtime: python
+    plan: starter          # free는 램 512MB라 워커 하나로 겨우 돈다
+    buildCommand: pip install -r requirements.txt
+    # 임시 파일이 인스턴스 로컬 디스크에 남는다. 인스턴스를 늘리면
+    # 업로드한 인스턴스와 변환을 요청한 인스턴스가 달라질 수 있으니 하나로 둔다.
+    numInstances: 1
+    # 워커 하나가 변환 중에 최대 300MB쯤 쓴다. starter(512MB)에서는 하나만.
+    # 램이 1GB 이상이면 -w 2, 2GB면 -w 4까지 올린다.
+    startCommand: gunicorn -w 1 --threads 4 --timeout 180 -b 0.0.0.0:$PORT app:app
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: CARTOON_MAX_UPLOAD_MB
+        value: "16"
+      - key: CARTOON_MAX_BATCH_FILES
+        value: "40"
+      - key: CARTOON_MAX_AGE_SECONDS
+        value: "3600"

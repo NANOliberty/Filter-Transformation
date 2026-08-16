@@ -1,0 +1,10 @@
+.git
+.gitignore
+.venv
+venv
+env
+__pycache__
+*.py[cod]
+cartoon_out
+*.log
+README.md

@@ -29,6 +29,7 @@ HALFTONE_PITCH = 150      # 긴 변을 이 값으로 나눈 만큼이 망점 한
 PENCIL_TONE = 0.30        # 연필 음영의 진하기 (0이면 흰 여백만 남는다)
 CRAYON_PAPER = 0.25       # 색연필 색을 종이 쪽으로 옅게 미는 정도
 NEON_EDGE_KEEP = 0.06     # 네온에서 선으로 살릴 상위 그라디언트 비율
+PIXEL_CELLS = 80          # 픽셀 스타일의 가로 칸 수
 
 
 def _nearest_center(Z, centers, chunk=1 << 20):
@@ -169,6 +170,29 @@ def _outline(img, block=9, c=7, thickness=1):
     return edges
 
 
+def _bold_lines(img, keep=0.04, cut=0.5, thickness=3, min_part=1500):
+    """굵고 이어지는 윤곽선만 남긴 마스크(255=선).
+
+    잔디나 털처럼 결이 촘촘한 곳에서는 짧은 선 조각이 사방에 생겨 검은
+    점처럼 뿌려진다. 결을 먼저 눌러 놓고, 이어진 덩어리가 일정 크기를
+    넘는 것만 남기면 굵은 외곽선만 살아남는다.
+    """
+    flat = cv2.edgePreservingFilter(img, flags=cv2.RECURS_FILTER,
+                                    sigma_s=60, sigma_r=0.45)
+    mask = (_edge_strength(flat, keep) > cut).astype(np.uint8)
+
+    h, w = mask.shape
+    min_area = max(20, int(h * w / min_part))
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    big = np.where(stats[:, cv2.CC_STAT_AREA] >= min_area)[0]
+    big = big[big != 0]                      # 0번은 배경
+    mask = np.isin(labels, big).astype(np.uint8) * 255
+
+    if thickness > 1:
+        mask = cv2.dilate(mask, np.ones((thickness, thickness), np.uint8))
+    return mask
+
+
 def style_pop(img, colors=None):
     """팝아트 — 채도를 끌어올리고 색을 줄인 뒤 굵은 선을 얹는다."""
     base = cv2.bilateralFilter(img, 9, 120, 120)
@@ -178,9 +202,54 @@ def style_pop(img, colors=None):
     vivid = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
 
     out = quantize(vivid, k=colors or 5)
-    # 털·머리카락 같은 잔결에서 선이 부서지지 않도록 부드럽게 만든 뒤 딴다.
-    out[_outline(base, block=15, c=11, thickness=3) > 0] = (25, 20, 30)
+    out[_bold_lines(base) > 0] = (25, 20, 30)
     return out
+
+
+def style_pixel(img, colors=None):
+    """픽셀 — 굵은 픽셀로 줄여 색을 묶고 그대로 확대한다."""
+    h, w = img.shape[:2]
+    sw = min(PIXEL_CELLS, w)
+    sh = max(int(round(h * sw / w)), 1)
+
+    small = cv2.resize(img, (sw, sh), interpolation=cv2.INTER_AREA)
+    hsv = cv2.cvtColor(small, cv2.COLOR_BGR2HSV).astype(np.float32)
+    hsv[..., 1] = np.clip(hsv[..., 1] * 1.25, 0, 255)   # 게임 화면처럼 또렷하게
+    small = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+    small = quantize(small, k=colors or 16)
+
+    return cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
+
+
+def style_horror(img, colors=None):
+    """호러 — 핏기를 걷어내고 검게 눌러 앉힌 뒤 가장자리를 어둡게 만든다."""
+    base = cv2.bilateralFilter(img, 9, 90, 90)
+
+    # 채도를 걷어내고 병색이 도는 초록으로 물들인다.
+    hsv = cv2.cvtColor(base, cv2.COLOR_BGR2HSV).astype(np.float32)
+    hsv[..., 1] *= 0.25
+    drained = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR).astype(np.float32)
+    drained *= np.float32([0.95, 1.08, 0.80])           # B, G, R
+
+    # 어두운 쪽을 더 어둡게 누르는 S자 커브
+    x = np.arange(256, dtype=np.float32) / 255.0
+    lut = np.uint8(np.clip((x - 0.5) * 1.6 + 0.5, 0, 1) ** 1.6 * 255)
+    out = cv2.LUT(np.clip(drained, 0, 255).astype(np.uint8), lut).astype(np.float32)
+
+    # 밝은 곳이 번지는 헐레이션 — 싸구려 필름으로 찍은 듯한 느낌을 준다.
+    out += cv2.GaussianBlur(np.clip(out - 150, 0, None), (0, 0), 12) * 0.35
+
+    # 가장자리로 갈수록 빛이 죽는 비네트
+    h, w = out.shape[:2]
+    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
+    cy, cx = (h - 1) / 2.0, (w - 1) / 2.0
+    dist = np.sqrt(((xx - cx) / cx) ** 2 + ((yy - cy) / cy) ** 2) / np.sqrt(2)
+    out *= np.clip(1.0 - 0.85 * dist ** 1.7, 0.05, 1.0)[..., None]
+
+    # 필름 그레인 — 시드를 고정해 같은 사진은 늘 같은 결과가 나오게 한다.
+    out += np.random.default_rng(20240816).normal(0, 15, (h, w, 1)).astype(np.float32)
+
+    return np.clip(out, 0, 255).astype(np.uint8)
 
 
 def _edge_strength(img, keep):
@@ -252,7 +321,8 @@ def style_halftone(img, colors=None, cell=None):
 STYLES = {"soft": style_soft, "blobby": style_blobby,
           "poster": style_poster, "ink": style_ink,
           "pop": style_pop, "oil": style_oil, "halftone": style_halftone,
-          "neon": style_neon, "pencil": style_pencil, "crayon": style_crayon}
+          "neon": style_neon, "pixel": style_pixel, "horror": style_horror,
+          "pencil": style_pencil, "crayon": style_crayon}
 
 # 웹 UI에 노출할 스타일 정보. tunable=False면 색상 수 조절이 의미 없다.
 STYLE_INFO = [
@@ -272,6 +342,10 @@ STYLE_INFO = [
      "desc": "옛날 인쇄물 같은 망점 무늬", "tunable": True},
     {"key": "neon", "label": "네온",
      "desc": "어두운 배경에 형광 윤곽선이 빛나는 느낌", "tunable": False},
+    {"key": "pixel", "label": "픽셀",
+     "desc": "옛날 게임 화면 같은 도트 그림", "tunable": True},
+    {"key": "horror", "label": "호러",
+     "desc": "핏기 없이 어둡게 가라앉은 공포 영화 톤", "tunable": False},
     {"key": "pencil", "label": "연필",
      "desc": "흑백 연필 스케치", "tunable": False},
     {"key": "crayon", "label": "색연필",

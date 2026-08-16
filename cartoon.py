@@ -25,6 +25,10 @@ _fit = fit
 KMEANS_CRITERIA = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
 KMEANS_SAMPLE = 80000     # 중심을 학습할 때 쓰는 최대 픽셀 수
 MEANSHIFT_SIDE = 700      # 평균이동 필터를 돌릴 최대 해상도
+HALFTONE_PITCH = 150      # 긴 변을 이 값으로 나눈 만큼이 망점 한 칸
+PENCIL_TONE = 0.30        # 연필 음영의 진하기 (0이면 흰 여백만 남는다)
+CRAYON_PAPER = 0.25       # 색연필 색을 종이 쪽으로 옅게 미는 정도
+NEON_EDGE_KEEP = 0.06     # 네온에서 선으로 살릴 상위 그라디언트 비율
 
 
 def _nearest_center(Z, centers, chunk=1 << 20):
@@ -91,16 +95,44 @@ def style_ink(img, colors=None):
     return cv2.bitwise_and(color, color, mask=edges)
 
 
+def _sketch_layers(img):
+    """연필 계열이 함께 쓰는 밑작업 — 평활화한 원본과 0~255 스케치.
+
+    pencilSketch는 국소 대비를 키우는 필터라 잔결이 있는 하늘·잔디에서
+    필름 노이즈까지 연필선으로 둔갑시킨다. 미리 살짝 눌러 두면
+    윤곽은 남고 잡티만 사라진다.
+    """
+    smooth = cv2.bilateralFilter(img, 9, 60, 60)
+    gray, _ = cv2.pencilSketch(smooth, sigma_s=60, sigma_r=0.07,
+                               shade_factor=0.02)
+    return smooth, gray.astype(np.float32)
+
+
 def style_pencil(img, colors=None):
     """연필 스케치 — 흑백 선과 부드러운 음영."""
-    gray, _ = cv2.pencilSketch(img, sigma_s=60, sigma_r=0.07, shade_factor=0.045)
-    return cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+    smooth, sketch = _sketch_layers(img)
+
+    # 밝기에 따라 옅은 음영을 깔아 준다. 이게 없으면 하늘처럼 매끈한 면이
+    # 그대로 흰 여백이 되어 그리다 만 그림처럼 보인다.
+    lum = cv2.GaussianBlur(cv2.cvtColor(smooth, cv2.COLOR_BGR2GRAY),
+                           (0, 0), 3).astype(np.float32)
+    tone = 255.0 - (255.0 - lum) * PENCIL_TONE
+
+    out = np.clip(sketch * tone / 255.0, 0, 255).astype(np.uint8)
+    return cv2.cvtColor(out, cv2.COLOR_GRAY2BGR)
 
 
 def style_crayon(img, colors=None):
-    """색연필 — 종이 위에 색으로 슥슥 그린 느낌."""
-    _, color = cv2.pencilSketch(img, sigma_s=60, sigma_r=0.07, shade_factor=0.04)
-    return color
+    """색연필 — 옅게 칠한 색 위에 연필선을 곱해 얹는다."""
+    smooth, sketch = _sketch_layers(img)
+
+    hsv = cv2.cvtColor(smooth, cv2.COLOR_BGR2HSV).astype(np.float32)
+    hsv[..., 1] = np.clip(hsv[..., 1] * 1.3, 0, 255)
+    color = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR).astype(np.float32)
+    color = color * (1 - CRAYON_PAPER) + 255.0 * CRAYON_PAPER  # 종이 쪽으로 옅게
+
+    out = color * (sketch / 255.0)[..., None]
+    return np.clip(out, 0, 255).astype(np.uint8)
 
 
 def style_oil(img, colors=None):
@@ -151,24 +183,41 @@ def style_pop(img, colors=None):
     return out
 
 
+def _edge_strength(img, keep):
+    """상위 keep 비율만 선으로 남기는 0~1 세기 맵.
+
+    고정 임계값을 쓰면 잔디·털처럼 결이 많은 사진에서 화면 전체가 선이
+    되어 버린다. 그라디언트 분위수로 기준을 잡으면 어떤 사진이든 선의
+    양이 비슷하게 유지된다.
+    """
+    gray = cv2.GaussianBlur(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), (0, 0), 2)
+    mag = cv2.magnitude(cv2.Scharr(gray, cv2.CV_32F, 1, 0),
+                        cv2.Scharr(gray, cv2.CV_32F, 0, 1))
+    hi = float(np.quantile(mag, 1.0 - keep))
+    lo = hi * 0.35
+    return np.clip((mag - lo) / max(hi - lo, 1e-6), 0, 1)
+
+
 def style_neon(img, colors=None):
     """네온 — 어두운 배경 위에 형광 윤곽선이 빛나는 느낌."""
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    edges = cv2.bitwise_or(cv2.Canny(cv2.GaussianBlur(gray, (5, 5), 0), 50, 140),
-                           _outline(img))
-    edges = cv2.dilate(edges, np.ones((2, 2), np.uint8))
-
-    glow = cv2.GaussianBlur(edges.astype(np.float32) / 255.0, (0, 0), 5)
-    glow = glow / max(float(glow.max()), 1e-6)
+    # 결을 먼저 눌러 두어야 잔디 같은 잔무늬가 통째로 발광하지 않는다.
+    flat = cv2.edgePreservingFilter(img, flags=cv2.RECURS_FILTER,
+                                    sigma_s=60, sigma_r=0.5)
+    strength = _edge_strength(flat, NEON_EDGE_KEEP)
+    glow = cv2.GaussianBlur(strength, (0, 0), 5)
+    glow = glow / max(float(glow.max()), 1e-6) * 0.55
 
     # 밝기에 따라 시안↔마젠타로 물드는 형광 색판
-    tint = cv2.applyColorMap(cv2.GaussianBlur(gray, (0, 0), 2),
-                             cv2.COLORMAP_COOL).astype(np.float32)
+    gray = cv2.GaussianBlur(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), (0, 0), 2)
+    tint = cv2.applyColorMap(gray, cv2.COLORMAP_COOL).astype(np.float32)
 
-    line = (edges > 0).astype(np.float32)[..., None]
-    amount = np.clip(glow[..., None] * 1.5 + line, 0, 1)
-    dark = cv2.bilateralFilter(img, 9, 150, 150).astype(np.float32) * 0.28
-    return np.clip(dark * (1 - amount) + tint * amount, 0, 255).astype(np.uint8)
+    amount = np.clip(strength + glow, 0, 1)[..., None]
+    dark = cv2.bilateralFilter(img, 9, 150, 150).astype(np.float32) * 0.30
+
+    # 더하기 대신 스크린 합성 — 밝은 곳이 255에 뭉개지지 않고 빛처럼 얹힌다.
+    light = tint * amount
+    out = 255.0 - (255.0 - dark) * (255.0 - light) / 255.0
+    return np.clip(out, 0, 255).astype(np.uint8)
 
 
 def style_halftone(img, colors=None, cell=None):
@@ -176,7 +225,7 @@ def style_halftone(img, colors=None, cell=None):
     flat = quantize(cv2.bilateralFilter(img, 9, 120, 120), k=colors or 8)
     h, w = flat.shape[:2]
     # 망점 크기는 해상도에 비례시켜, 사진이 커져도 같은 인상을 유지한다.
-    cell = int(cell or np.clip(round(max(h, w) / 90), 6, 16))
+    cell = int(cell or np.clip(round(max(h, w) / HALFTONE_PITCH), 4, 12))
 
     # 셀 단위 평균 밝기 — 어두울수록 점이 커진다.
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0

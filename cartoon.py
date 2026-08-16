@@ -2,15 +2,21 @@
 
 CLI(cartoonize.py)와 웹 서버(app.py)가 이 모듈을 함께 사용한다.
 """
+import os
+
 import cv2
 import numpy as np
 
 EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff"}
-MAX_SIDE = 1400
+
+# 처리 해상도. 변환 시간은 픽셀 수에 거의 비례하므로, CPU가 넉넉하지 않은
+# 곳에 올릴 때 이 값을 낮추면 그만큼 빨라진다.
+MAX_SIDE = max(int(os.environ.get("CARTOON_MAX_SIDE", "1400")), 200)
 
 
-def fit(img, max_side=MAX_SIDE):
+def fit(img, max_side=None):
     """긴 변이 max_side를 넘으면 비율을 유지한 채 줄인다."""
+    max_side = max_side or MAX_SIDE
     h, w = img.shape[:2]
     if max(h, w) <= max_side:
         return img

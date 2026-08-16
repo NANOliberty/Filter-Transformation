@@ -29,7 +29,7 @@ HALFTONE_PITCH = 150      # 긴 변을 이 값으로 나눈 만큼이 망점 한
 PENCIL_TONE = 0.30        # 연필 음영의 진하기 (0이면 흰 여백만 남는다)
 CRAYON_PAPER = 0.25       # 색연필 색을 종이 쪽으로 옅게 미는 정도
 NEON_EDGE_KEEP = 0.06     # 네온에서 선으로 살릴 상위 그라디언트 비율
-PIXEL_CELLS = 80          # 픽셀 스타일의 가로 칸 수
+PIXEL_CELLS = 140         # 픽셀 스타일의 가로 칸 수
 
 
 def _nearest_center(Z, centers, chunk=1 << 20):
@@ -170,7 +170,7 @@ def _outline(img, block=9, c=7, thickness=1):
     return edges
 
 
-def _bold_lines(img, keep=0.04, cut=0.5, thickness=3, min_part=1500):
+def _bold_lines(img, keep=0.04, cut=0.5, thickness=2, min_part=1500):
     """굵고 이어지는 윤곽선만 남긴 마스크(255=선).
 
     잔디나 털처럼 결이 촘촘한 곳에서는 짧은 선 조각이 사방에 생겨 검은
@@ -225,11 +225,11 @@ def style_horror(img, colors=None):
     """호러 — 핏기를 걷어내고 검게 눌러 앉힌 뒤 가장자리를 어둡게 만든다."""
     base = cv2.bilateralFilter(img, 9, 90, 90)
 
-    # 채도를 걷어내고 병색이 도는 초록으로 물들인다.
+    # 색을 거의 다 걷어내고 푸른 기만 남긴다.
     hsv = cv2.cvtColor(base, cv2.COLOR_BGR2HSV).astype(np.float32)
-    hsv[..., 1] *= 0.25
+    hsv[..., 1] *= 0.08
     drained = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR).astype(np.float32)
-    drained *= np.float32([0.95, 1.08, 0.80])           # B, G, R
+    drained *= np.float32([1.16, 1.00, 0.90])           # B, G, R
 
     # 어두운 쪽을 더 어둡게 누르는 S자 커브
     x = np.arange(256, dtype=np.float32) / 255.0

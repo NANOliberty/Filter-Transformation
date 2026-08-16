@@ -14,7 +14,13 @@
 <header class="site-header">
   <div class="wrap">
     <h1><span class="logo"></span> 만화 필터</h1>
-    <p class="tagline">사진 한 장을 {{ styles | length }}가지로 비교하거나, 여러 장을 한 번에 바꿔 드려요.</p>
+    <p class="tagline">
+      {%- if styles | length == 1 -%}
+        사진을 {{ styles[0].label }} 그림풍으로 바꿔 드려요. 여러 장도 한 번에 됩니다.
+      {%- else -%}
+        사진 한 장을 {{ styles | length }}가지로 비교하거나, 여러 장을 한 번에 바꿔 드려요.
+      {%- endif -%}
+    </p>
   </div>
 </header>
 
@@ -23,12 +29,17 @@
   <!-- 모드 선택 -->
   <div id="modes" class="modes" role="tablist">
     <button type="button" class="mode on" data-mode="single" role="tab">
+      {%- if styles | length == 1 %}
+      <strong>한 장 변환</strong>
+      <span>사진 하나를 {{ styles[0].label }} 스타일로</span>
+      {%- else %}
       <strong>한 장 비교</strong>
       <span>사진 하나를 {{ styles | length }}가지 스타일로</span>
+      {%- endif %}
     </button>
     <button type="button" class="mode" data-mode="batch" role="tab">
       <strong>여러 장 한 번에</strong>
-      <span>폴더째 올리고 원하는 스타일로</span>
+      <span>{% if styles | length == 1 %}폴더째 올리면 전부 바꿔 드려요{% else %}폴더째 올리고 원하는 스타일로{% endif %}</span>
     </button>
   </div>
 
@@ -125,7 +136,7 @@
         </div>
       </div>
 
-      <div class="picker">
+      <div class="picker"{% if styles | length == 1 %} hidden{% endif %}>
         <div class="picker-head">
           <span class="control-label">적용할 스타일</span>
           <button type="button" id="btn-style-all" class="link-btn">전체 선택</button>

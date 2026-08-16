@@ -1,4 +1,4 @@
-/* 색은 전부 여기 토큰으로만 쓴다. 다크 모드는 값만 갈아 끼우면 된다. */
+/* 색은 전부 여기 토큰으로만 쓴다. 개별 규칙에는 색을 직접 적지 않는다. */
 :root {
   color-scheme: light;
 
@@ -26,7 +26,6 @@
   --danger-ink: #b23c1e;
   --spinner-track: #ffd6c3;
 
-  --seg-on: #ffffff;           /* 세그먼트에서 선택된 칸 */
   --glass: rgba(255, 255, 255, .9);
   --glass-strong: #ffffff;
   --overlay: rgba(47, 42, 38, .82);
@@ -40,93 +39,7 @@
   --radius: 18px;
 }
 
-/* 시스템 설정이 어두울 때. 사용자가 밝게를 고르면 적용하지 않는다. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-
-    --bg: #17130f;
-    --bg-tint: #251d17;
-    --card: #201a15;
-    --ink: #f2e8de;
-    --muted: #a2938a;
-    --line: #372e27;
-    --line-hover: #5b473a;
-
-    --accent: #ff8a5c;
-    --accent-strong: #ff9e77;
-    --accent-soft: #3a2318;
-    --accent-fade: #a85a35;
-    --accent-ink: #ffb190;
-    --on-accent: #241610;
-    --accent-2: #5cc7b4;
-
-    --glow-1: #2d1a10;
-    --glow-2: #11302c;
-
-    --danger-bg: #3b1d16;
-    --danger-line: #6d3627;
-    --danger-ink: #ffa286;
-    --spinner-track: #4d3527;
-
-    --seg-on: #3d322a;
-    --glass: rgba(26, 20, 16, .85);
-    --glass-strong: #1a1410;
-    --overlay: rgba(8, 6, 5, .88);
-    --overlay-btn: rgba(255, 255, 255, .14);
-    --overlay-btn-hover: rgba(255, 255, 255, .26);
-
-    --shadow: 0 10px 26px rgba(0, 0, 0, .45);
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, .5);
-    --shadow-inset: 0 1px 4px rgba(0, 0, 0, .5);
-  }
-}
-
-/* 사용자가 직접 어둡게를 고른 경우 — 시스템 설정을 이긴다. */
-:root[data-theme="dark"] {
-  color-scheme: dark;
-
-  --bg: #17130f;
-  --bg-tint: #251d17;
-  --card: #201a15;
-  --ink: #f2e8de;
-  --muted: #a2938a;
-  --line: #372e27;
-  --line-hover: #5b473a;
-
-  --accent: #ff8a5c;
-  --accent-strong: #ff9e77;
-  --accent-soft: #3a2318;
-  --accent-fade: #a85a35;
-  --accent-ink: #ffb190;
-  --on-accent: #241610;
-  --accent-2: #5cc7b4;
-
-  --glow-1: #2d1a10;
-  --glow-2: #11302c;
-
-  --danger-bg: #3b1d16;
-  --danger-line: #6d3627;
-  --danger-ink: #ffa286;
-  --spinner-track: #4d3527;
-
-  --seg-on: #3d322a;
-  --glass: rgba(26, 20, 16, .85);
-  --glass-strong: #1a1410;
-  --overlay: rgba(8, 6, 5, .88);
-  --overlay-btn: rgba(255, 255, 255, .14);
-  --overlay-btn-hover: rgba(255, 255, 255, .26);
-
-  --shadow: 0 10px 26px rgba(0, 0, 0, .45);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, .5);
-  --shadow-inset: 0 1px 4px rgba(0, 0, 0, .5);
-}
-
 * { box-sizing: border-box; }
-
-/* 테마를 바꾸는 찰나에는 전환 효과를 끈다. 배경만 먼저 바뀌고 글씨는
-   그대로라 잠깐 글씨가 묻히는 것을 막는다. */
-.no-transition, .no-transition * { transition: none !important; }
 
 /* display를 직접 지정한 요소도 hidden 속성을 지키게 한다. */
 [hidden] { display: none !important; }
@@ -153,16 +66,6 @@ body {
 /* ------------------------------------------------------------ 헤더/푸터 */
 
 .site-header { padding: 44px 0 28px; text-align: center; }
-
-.site-header .wrap { position: relative; }
-
-.theme {
-  position: absolute;
-  top: -12px;
-  right: 20px;
-}
-
-.theme button { padding: 6px 11px; font-size: 13px; }
 
 .site-header h1 {
   margin: 0;
@@ -362,7 +265,7 @@ kbd {
 .segmented button:hover { color: var(--ink); }
 
 .segmented button.on {
-  background: var(--seg-on);
+  background: var(--card);
   color: var(--accent);
   font-weight: 700;
   box-shadow: var(--shadow-inset);
@@ -676,8 +579,6 @@ kbd {
 .lb-close:hover { background: var(--overlay-btn-hover); }
 
 @media (max-width: 640px) {
-  .theme { position: static; margin: 0 auto 14px; display: inline-flex; }
-  .site-header { padding-top: 24px; }
   .toolbar { flex-direction: column; align-items: stretch; }
   .controls { justify-content: space-between; }
   .dropzone { padding: 38px 18px; }

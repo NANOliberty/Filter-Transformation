@@ -1,18 +1,17 @@
-# Render 블루프린트. 저장소를 연결하면 이 설정대로 서비스가 만들어진다.
-# 무료 플랜 기준으로 맞춰 두었다. https://render.com/docs/blueprint-spec
+# Render 블루프린트 — 포스터 한 종류만 돌리는 배포판.
+# 무료 플랜의 좁은 CPU에 맞춰, 사진 한 장에 변환을 한 번만 한다.
 services:
   - type: web
-    name: cartoon-filter
+    name: cartoon-poster
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
 
-    # 임시 파일이 인스턴스 로컬 디스크에 남는다. 인스턴스를 늘리면
-    # 업로드한 인스턴스와 변환을 요청한 인스턴스가 달라질 수 있으니 하나로 둔다.
+    # 임시 파일이 인스턴스 로컬 디스크에 남는다. 늘리면 업로드한 인스턴스와
+    # 변환을 요청한 인스턴스가 달라질 수 있으니 하나로 둔다.
     numInstances: 1
 
-    # 무료 플랜은 램 512MB. 워커 하나가 변환 중 300MB쯤 쓰므로 하나만 띄운다.
-    # 램이 1GB 이상인 플랜으로 올리면 -w 2, 2GB면 -w 4까지 늘린다.
+    # 무료 플랜은 램 512MB. 워커 하나가 변환 중 300MB쯤 쓴다.
     startCommand: gunicorn -w 1 --threads 2 --timeout 180 -b 0.0.0.0:$PORT app:app
 
     healthCheckPath: /healthz
@@ -21,17 +20,18 @@ services:
       - key: PYTHON_VERSION
         value: "3.11"
 
-      # 무료 플랜은 CPU를 조각으로 준다. 변환 시간은 픽셀 수에 거의 비례하므로
-      # 처리 해상도를 낮춰 체감 속도를 맞춘다. 유료로 올리면 1400으로 되돌린다.
+      # 이 배포판의 핵심 — 포스터 하나만 켠다. 사진 한 장에 열두 번 하던
+      # 변환이 한 번이 된다.
+      - key: CARTOON_STYLES
+        value: "poster"
+
+      # 변환이 한 번뿐이라 해상도를 무료 플랜 기준보다 올려 잡는다.
       - key: CARTOON_MAX_SIDE
-        value: "1000"
+        value: "1400"
 
-      # 무료 플랜에서 40장 × 12스타일(480장)은 너무 오래 걸린다.
       - key: CARTOON_MAX_BATCH_FILES
-        value: "12"
+        value: "30"
       - key: CARTOON_MAX_UPLOAD_MB
-        value: "8"
-
-      # 디스크도 넉넉하지 않으니 보관 시간을 30분으로 줄인다.
+        value: "12"
       - key: CARTOON_MAX_AGE_SECONDS
         value: "1800"

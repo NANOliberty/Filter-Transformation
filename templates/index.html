@@ -13,40 +13,135 @@
 <header class="site-header">
   <div class="wrap">
     <h1><span class="logo">🎨</span> 만화 필터</h1>
-    <p class="tagline">사진 한 장 올리면 {{ styles | length }}가지 그림풍으로 뚝딱 바꿔 드려요.</p>
+    <p class="tagline">사진 한 장을 {{ styles | length }}가지로 비교하거나, 여러 장을 한 번에 바꿔 드려요.</p>
   </div>
 </header>
 
 <main class="wrap">
 
-  <!-- 업로드 -->
-  <section id="uploader" class="uploader">
-    <label id="dropzone" class="dropzone" for="file-input" tabindex="0">
-      <div class="dz-emoji" aria-hidden="true">🖼️</div>
-      <p class="dz-title">여기로 사진을 끌어다 놓으세요</p>
-      <p class="dz-sub">클릭해서 고르거나 <kbd>Ctrl</kbd>+<kbd>V</kbd>로 붙여넣어도 돼요</p>
-      <p class="dz-hint">JPG · PNG · WEBP · BMP · TIFF · 최대 {{ max_upload_mb }}MB</p>
-      <input id="file-input" type="file" accept="image/*" hidden>
-    </label>
-    <p id="upload-error" class="error" hidden></p>
-    <div id="upload-progress" class="progress" hidden><span></span></div>
-  </section>
+  <!-- 모드 선택 -->
+  <div id="modes" class="modes" role="tablist">
+    <button type="button" class="mode on" data-mode="single" role="tab">
+      <strong>한 장 비교</strong>
+      <span>사진 하나를 {{ styles | length }}가지 스타일로</span>
+    </button>
+    <button type="button" class="mode" data-mode="batch" role="tab">
+      <strong>여러 장 한 번에</strong>
+      <span>폴더째 올리고 원하는 스타일로</span>
+    </button>
+  </div>
 
-  <!-- 작업 영역 -->
-  <section id="workspace" class="workspace" hidden>
-    <div class="toolbar">
-      <div class="source">
-        <img id="source-thumb" alt="원본 미리보기">
-        <div class="source-meta">
-          <strong id="source-name">—</strong>
-          <span id="source-size" class="muted"></span>
+  <!-- ===================================================== 한 장 비교 -->
+  <section id="single-mode">
+    <section id="uploader" class="uploader">
+      <label id="dropzone" class="dropzone" for="file-input" tabindex="0">
+        <div class="dz-emoji" aria-hidden="true">🖼️</div>
+        <p class="dz-title">여기로 사진을 끌어다 놓으세요</p>
+        <p class="dz-sub">클릭해서 고르거나 <kbd>Ctrl</kbd>+<kbd>V</kbd>로 붙여넣어도 돼요</p>
+        <p class="dz-hint">JPG · PNG · WEBP · BMP · TIFF · 최대 {{ max_upload_mb }}MB</p>
+        <input id="file-input" type="file" accept="image/*" hidden>
+      </label>
+      <p id="upload-error" class="error" hidden></p>
+      <div id="upload-progress" class="progress" hidden><span></span></div>
+    </section>
+
+    <section id="workspace" class="workspace" hidden>
+      <div class="toolbar">
+        <div class="source">
+          <img id="source-thumb" alt="원본 미리보기">
+          <div class="source-meta">
+            <strong id="source-name">—</strong>
+            <span id="source-size" class="muted"></span>
+          </div>
+        </div>
+
+        <div class="controls">
+          <div class="control">
+            <span class="control-label">색상 수</span>
+            <div id="colors" class="segmented" role="group" aria-label="색상 수 선택">
+              <button type="button" data-colors="0" class="on">자동</button>
+              <button type="button" data-colors="6">적게</button>
+              <button type="button" data-colors="10">보통</button>
+              <button type="button" data-colors="16">많이</button>
+            </div>
+          </div>
+          <div class="actions">
+            <span id="progress-count" class="progress-count muted"></span>
+            <button id="btn-zip" type="button" class="btn btn-primary">전체 다운로드</button>
+            <button id="btn-reset" type="button" class="btn">새 이미지</button>
+          </div>
         </div>
       </div>
 
-      <div class="controls">
+      <div class="grid">
+        {% for s in styles %}
+        <article class="card" data-style="{{ s.key }}" data-tunable="{{ 1 if s.tunable else 0 }}">
+          <div class="frame">
+            <img class="result" alt="{{ s.label }} 스타일 결과" hidden>
+            <div class="state">대기 중</div>
+            <button type="button" class="zoom" hidden aria-label="크게 보기">⤢</button>
+          </div>
+          <div class="card-foot">
+            <div>
+              <strong>{{ s.label }}</strong>
+              <p class="muted">{{ s.desc }}</p>
+            </div>
+            <a class="btn btn-sm download" hidden download>저장</a>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+  </section>
+
+  <!-- ================================================= 여러 장 한 번에 -->
+  <section id="batch-mode" hidden>
+    <label id="batch-dropzone" class="dropzone" for="batch-file-input" tabindex="0">
+      <div class="dz-emoji" aria-hidden="true">🗂️</div>
+      <p class="dz-title">사진 여러 장이나 폴더를 끌어다 놓으세요</p>
+      <p class="dz-sub">
+        <span class="pseudo-btn" id="pick-files">파일 고르기</span>
+        <span class="pseudo-btn" id="pick-folder">폴더 고르기</span>
+      </p>
+      <p class="dz-hint">한 번에 {{ max_batch_files }}장까지 · 장당 최대 {{ max_upload_mb }}MB</p>
+      <input id="batch-file-input" type="file" accept="image/*" multiple hidden>
+      <input id="batch-folder-input" type="file" accept="image/*" multiple webkitdirectory hidden>
+    </label>
+
+    <p id="batch-error" class="error" hidden></p>
+
+    <div id="batch-setup" class="batch-setup" hidden>
+      <div class="toolbar batch-toolbar">
+        <div class="source">
+          <div class="stack" id="batch-stack"></div>
+          <div class="source-meta">
+            <strong id="batch-count">—</strong>
+            <span id="batch-names" class="muted"></span>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="btn-batch-clear" type="button" class="btn">비우기</button>
+        </div>
+      </div>
+
+      <div class="picker">
+        <div class="picker-head">
+          <span class="control-label">적용할 스타일</span>
+          <button type="button" id="btn-style-all" class="link-btn">전체 선택</button>
+        </div>
+        <div id="batch-styles" class="chips">
+          {% for s in styles %}
+          <button type="button" class="chip{{ ' on' if loop.first }}"
+                  data-style="{{ s.key }}" data-tunable="{{ 1 if s.tunable else 0 }}"
+                  title="{{ s.desc }}">{{ s.label }}</button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="toolbar batch-run">
         <div class="control">
           <span class="control-label">색상 수</span>
-          <div id="colors" class="segmented" role="group" aria-label="색상 수 선택">
+          <div id="batch-colors" class="segmented" role="group" aria-label="색상 수 선택">
             <button type="button" data-colors="0" class="on">자동</button>
             <button type="button" data-colors="6">적게</button>
             <button type="button" data-colors="10">보통</button>
@@ -54,30 +149,14 @@
           </div>
         </div>
         <div class="actions">
-          <span id="progress-count" class="progress-count muted"></span>
-          <button id="btn-zip" type="button" class="btn btn-primary">전체 다운로드</button>
-          <button id="btn-reset" type="button" class="btn">새 이미지</button>
+          <span id="batch-progress" class="progress-count muted"></span>
+          <button id="btn-batch-run" type="button" class="btn btn-primary">변환 시작</button>
+          <button id="btn-batch-zip" type="button" class="btn" hidden>zip 다운로드</button>
         </div>
+        <p id="batch-hint" class="hint" hidden></p>
       </div>
-    </div>
 
-    <div class="grid">
-      {% for s in styles %}
-      <article class="card" data-style="{{ s.key }}" data-tunable="{{ 1 if s.tunable else 0 }}">
-        <div class="frame">
-          <img class="result" alt="{{ s.label }} 스타일 결과" hidden>
-          <div class="state">대기 중</div>
-          <button type="button" class="zoom" hidden aria-label="크게 보기">⤢</button>
-        </div>
-        <div class="card-foot">
-          <div>
-            <strong>{{ s.label }}</strong>
-            <p class="muted">{{ s.desc }}</p>
-          </div>
-          <a class="btn btn-sm download" hidden download>저장</a>
-        </div>
-      </article>
-      {% endfor %}
+      <div id="batch-grid" class="grid batch-grid"></div>
     </div>
   </section>
 </main>
@@ -98,6 +177,7 @@
 <script>
   window.APP_CONFIG = {
     maxUploadMb: {{ max_upload_mb }},
+    maxBatchFiles: {{ max_batch_files }},
     styles: {{ styles | tojson }}
   };
 </script>

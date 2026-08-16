@@ -61,6 +61,41 @@ body {
   font-size: 13px;
 }
 
+/* ------------------------------------------------------------ 모드 선택 */
+
+.modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.mode {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 16px;
+  padding: 13px 16px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: border-color .15s, background .15s, transform .1s;
+}
+
+.mode:hover { border-color: #ffcdb6; transform: translateY(-1px); }
+
+.mode strong { font-size: 15px; }
+.mode span { font-size: 12.5px; color: var(--muted); }
+
+.mode.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.mode.on strong { color: #d2522a; }
+
 /* ------------------------------------------------------------ 업로드 */
 
 .uploader { margin-top: 8px; }
@@ -252,6 +287,126 @@ kbd {
 
 .btn-sm { padding: 6px 12px; font-size: 13px; }
 
+/* --------------------------------------------------------- 일괄 변환 */
+
+.pseudo-btn {
+  display: inline-block;
+  border: 1px solid var(--line);
+  background: var(--bg-tint);
+  border-radius: 10px;
+  padding: 6px 13px;
+  margin: 6px 3px 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.pseudo-btn:hover { background: #ffe0ce; border-color: #ffcdb6; }
+
+/* 사진을 고르고 나면 드롭존이 자리를 덜 차지하게 접는다. */
+.dropzone.compact { padding: 18px 20px; }
+.dropzone.compact .dz-emoji { font-size: 26px; }
+.dropzone.compact .dz-title { margin: 6px 0 2px; font-size: 15px; }
+.dropzone.compact .dz-hint { display: none; }
+.dropzone.compact .dz-sub { margin: 0; }
+.dropzone.compact .pseudo-btn { margin-top: 4px; padding: 4px 11px; font-size: 12.5px; }
+
+.hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  flex-basis: 100%;
+  text-align: right;
+}
+
+.batch-setup { margin-top: 18px; display: flex; flex-direction: column; gap: 14px; }
+
+.batch-toolbar, .batch-run { margin: 0; }
+
+/* 올린 사진을 겹쳐 쌓아 몇 장인지 한눈에 보이게 */
+.stack {
+  position: relative;
+  width: 74px;
+  height: 58px;
+  flex: none;
+}
+
+.stack img {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 2px solid var(--card);
+  background: var(--bg-tint);
+  box-shadow: 0 2px 6px rgba(90, 60, 40, .16);
+}
+
+.stack img:nth-child(1) { left: 0;    top: 6px; }
+.stack img:nth-child(2) { left: 9px;  top: 6px; }
+.stack img:nth-child(3) { left: 18px; top: 6px; }
+.stack img:nth-child(4) { left: 27px; top: 6px; }
+
+.picker {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  box-shadow: var(--shadow);
+}
+
+.picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.link-btn {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.link-btn:hover { text-decoration: underline; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.chip {
+  border: 1px solid var(--line);
+  background: var(--bg-tint);
+  border-radius: 999px;
+  padding: 7px 15px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+
+.chip:hover { color: var(--ink); border-color: #ffcdb6; }
+
+.chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.batch-grid .frame { aspect-ratio: 1 / 1; }
+.batch-grid .card-foot strong {
+  display: block;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ------------------------------------------------------------ 결과 카드 */
 
 .grid {
@@ -400,4 +555,7 @@ kbd {
   .toolbar { flex-direction: column; align-items: stretch; }
   .controls { justify-content: space-between; }
   .dropzone { padding: 38px 18px; }
+  .modes { grid-template-columns: 1fr; }
+  .batch-run { gap: 12px; }
+  .actions { flex-wrap: wrap; }
 }

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>만화 필터 · 사진을 만화처럼</title>
-<meta name="description" content="사진을 올리면 네 가지 만화풍 스타일로 바꿔 줍니다.">
+<meta name="description" content="사진을 올리면 열 가지 만화풍 스타일로 바꿔 줍니다.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎨</text></svg>">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
@@ -13,7 +13,7 @@
 <header class="site-header">
   <div class="wrap">
     <h1><span class="logo">🎨</span> 만화 필터</h1>
-    <p class="tagline">사진 한 장 올리면 네 가지 만화풍으로 뚝딱 바꿔 드려요.</p>
+    <p class="tagline">사진 한 장 올리면 {{ styles | length }}가지 그림풍으로 뚝딱 바꿔 드려요.</p>
   </div>
 </header>
 
@@ -54,6 +54,7 @@
           </div>
         </div>
         <div class="actions">
+          <span id="progress-count" class="progress-count muted"></span>
           <button id="btn-zip" type="button" class="btn btn-primary">전체 다운로드</button>
           <button id="btn-reset" type="button" class="btn">새 이미지</button>
         </div>
@@ -65,7 +66,7 @@
       <article class="card" data-style="{{ s.key }}" data-tunable="{{ 1 if s.tunable else 0 }}">
         <div class="frame">
           <img class="result" alt="{{ s.label }} 스타일 결과" hidden>
-          <div class="state state-wait">대기 중</div>
+          <div class="state">대기 중</div>
           <button type="button" class="zoom" hidden aria-label="크게 보기">⤢</button>
         </div>
         <div class="card-foot">

@@ -10,7 +10,8 @@ import zipfile
 
 import cv2
 import numpy as np
-from flask import Flask, abort, jsonify, request, send_file, render_template
+from flask import (Flask, abort, jsonify, request, send_file, render_template,
+                   url_for)
 
 from cartoon import STYLE_INFO, STYLES, apply_style, fit, normalize_colors
 
@@ -144,6 +145,23 @@ def _result_url(token, index, style, colors, download=False):
 def _item_json(token, index, stem, size):
     return {"index": index, "name": stem, "width": size[0], "height": size[1],
             "src_url": f"/api/image/{token}/{index}/src"}
+
+
+@app.context_processor
+def _assets():
+    """정적 파일 주소에 수정 시각을 붙인다.
+
+    파일을 고쳤는데 브라우저가 예전 css·js를 붙들고 있으면, 새 화면에
+    옛 스크립트가 얹혀 페이지 전체가 먹통이 된다. 주소가 바뀌면 그럴 일이 없다.
+    """
+    def asset(filename):
+        try:
+            stamp = int(os.path.getmtime(os.path.join(app.static_folder, filename)))
+        except OSError:
+            stamp = 0
+        return url_for("static", filename=filename, v=stamp)
+
+    return {"asset": asset}
 
 
 # -------------------------------------------------------------------- 라우트

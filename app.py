@@ -31,6 +31,28 @@ JPEG_PARAMS = [cv2.IMWRITE_JPEG_QUALITY, 95]
 TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
 MIN_COLORS, MAX_COLORS = 3, 32
 
+def _enabled_styles():
+    """켤 스타일 목록. CARTOON_STYLES가 비어 있으면 전부 켠다.
+
+    CPU가 빠듯한 곳에서는 한둘만 켜서 서버가 할 일을 줄인다.
+    화면도 켜진 만큼만 그려진다.
+    """
+    raw = os.environ.get("CARTOON_STYLES", "").strip()
+    if not raw:
+        return list(STYLES)
+
+    picked = [s.strip() for s in raw.split(",") if s.strip()]
+    unknown = [s for s in picked if s not in STYLES]
+    if unknown:
+        raise SystemExit(f"CARTOON_STYLES에 알 수 없는 스타일: {', '.join(unknown)}\n"
+                         f"쓸 수 있는 값: {', '.join(STYLES)}")
+    return picked or list(STYLES)
+
+
+ENABLED = _enabled_styles()
+# 화면에 보일 순서는 STYLE_INFO의 순서를 따른다.
+ENABLED_INFO = [s for s in STYLE_INFO if s["key"] in ENABLED]
+
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 os.makedirs(WORK_DIR, exist_ok=True)
@@ -191,7 +213,7 @@ def _assets():
 
 @app.get("/")
 def index():
-    return render_template("index.html", styles=STYLE_INFO,
+    return render_template("index.html", styles=ENABLED_INFO,
                            max_upload_mb=MAX_UPLOAD_MB,
                            max_batch_files=MAX_BATCH_FILES,
                            concurrency=CONCURRENCY,
@@ -309,8 +331,8 @@ def transform():
     data = request.get_json(silent=True) or {}
     token = _check_token(str(data.get("token", "")))
     style = str(data.get("style", ""))
-    if style not in STYLES:
-        return jsonify(error="알 수 없는 스타일입니다."), 400
+    if style not in ENABLED:
+        return jsonify(error="이 서버에서 켜 두지 않은 스타일입니다."), 400
 
     colors = normalize_colors(style, _parse_colors(data.get("colors")))
     meta = _meta(token)
@@ -347,7 +369,7 @@ def image_src(token, index):
 @app.get("/api/image/<token>/<int:index>/<style>/<int:colors>")
 def image_result(token, index, style, colors):
     _check_token(token)
-    if style not in STYLES:
+    if style not in ENABLED:
         abort(404)
     if colors and not (MIN_COLORS <= colors <= MAX_COLORS):
         abort(404)
@@ -371,10 +393,10 @@ def download_zip(token):
     wanted = _parse_colors(request.args.get("colors"))
 
     styles = [s for s in request.args.get("styles", "").split(",") if s]
-    unknown = [s for s in styles if s not in STYLES]
+    unknown = [s for s in styles if s not in ENABLED]
     if unknown:
         abort(400, description="알 수 없는 스타일입니다.")
-    styles = styles or list(STYLES)
+    styles = styles or list(ENABLED)
 
     # 파일 이름이 겹치면 앞에 번호를 붙여 서로 덮어쓰지 않게 한다.
     counts = {}
@@ -425,7 +447,7 @@ def _json_error(err):
     desc = getattr(err, "description", "요청을 처리하지 못했습니다.")
     if request.path.startswith("/api/"):
         return jsonify(error=desc), err.code
-    return render_template("index.html", styles=STYLE_INFO,
+    return render_template("index.html", styles=ENABLED_INFO,
                            max_upload_mb=MAX_UPLOAD_MB,
                            max_batch_files=MAX_BATCH_FILES,
                            concurrency=CONCURRENCY,

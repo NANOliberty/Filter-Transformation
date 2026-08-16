@@ -2,7 +2,8 @@
 (function () {
   "use strict";
 
-  var cfg = window.APP_CONFIG || { maxUploadMb: 16, maxBatchFiles: 40, styles: [] };
+  var cfg = window.APP_CONFIG ||
+    { maxUploadMb: 16, maxBatchFiles: 40, concurrency: 1, styles: [] };
 
   var $ = function (sel, root) { return (root || document).querySelector(sel); };
   var $$ = function (sel, root) {
@@ -53,11 +54,28 @@
     el.hidden = !msg;
   }
 
-  // 순서대로 하나씩 처리한다. CPU를 아끼고 진행 상황도 또렷해진다.
+  // 순서대로 하나씩 처리한다. 업로드처럼 순서가 중요한 일에 쓴다.
   function sequential(items, worker) {
     return items.reduce(function (chain, item, i) {
       return chain.then(function () { return worker(item, i); });
     }, Promise.resolve());
+  }
+
+  // 한 번에 limit개씩 굴린다. 서버가 코어를 여러 개 쓸 수 있을 때 그만큼 빨라진다.
+  // limit이 1이면 예전처럼 한 장씩 순서대로 처리한다.
+  function pooled(items, worker) {
+    var limit = Math.max(1, cfg.concurrency | 0);
+    if (limit === 1) return sequential(items, worker);
+
+    var next = 0;
+    function lane() {
+      var i = next++;
+      if (i >= items.length) return Promise.resolve();
+      return Promise.resolve(worker(items[i], i)).then(lane);
+    }
+    var lanes = [];
+    for (var n = 0; n < Math.min(limit, items.length); n++) lanes.push(lane());
+    return Promise.all(lanes);
   }
 
   function segmented(group, onChange) {
@@ -230,7 +248,7 @@
       var done = 0;
       showProgress(done, list.length);
 
-      return sequential(list, function (style) {
+      return pooled(list, function (style) {
         if (run !== state.run) return;
         return transformOne(style, run).then(function () {
           if (run === state.run) showProgress(++done, list.length);
@@ -460,7 +478,7 @@
       var done = 0;
       progressEl.textContent = "0 / " + jobs.length + " 변환 중…";
 
-      sequential(jobs, function (job) {
+      pooled(jobs, function (job) {
         if (runId !== state.run) return;
         var card = addCard(job.item, job.style);
         var img = $(".result", card);

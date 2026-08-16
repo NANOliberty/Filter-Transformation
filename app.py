@@ -18,6 +18,9 @@ from cartoon import STYLE_INFO, STYLES, apply_style, fit, normalize_colors
 MAX_UPLOAD_MB = int(os.environ.get("CARTOON_MAX_UPLOAD_MB", "16"))
 MAX_AGE_SECONDS = int(os.environ.get("CARTOON_MAX_AGE_SECONDS", "3600"))
 MAX_BATCH_FILES = int(os.environ.get("CARTOON_MAX_BATCH_FILES", "40"))
+# 브라우저가 한 번에 몇 장씩 변환을 요청할지. 1이면 예전처럼 한 장씩 처리한다.
+# 서버가 동시에 그만큼 돌리므로 메모리도 그만큼 더 쓴다.
+CONCURRENCY = max(int(os.environ.get("CARTOON_CONCURRENCY", "1")), 1)
 WORK_DIR = os.environ.get(
     "CARTOON_WORKDIR",
     os.path.join(os.environ.get("TMPDIR", "/tmp"), "cartoon_web"),
@@ -99,6 +102,25 @@ def _safe_stem(name):
     return stem[:60] or "image"
 
 
+def _write_atomic(path, data):
+    """임시 이름으로 다 쓴 뒤 자리를 바꾼다.
+
+    변환을 여러 개 동시에 돌리면 같은 파일을 두 요청이 함께 쓸 수 있다.
+    이렇게 두면 읽는 쪽이 절반만 쓰인 파일을 보는 일이 없다.
+    """
+    tmp = f"{path}.{uuid.uuid4().hex}.tmp"
+    try:
+        with open(tmp, "wb") as fp:
+            fp.write(data)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def _encode_jpeg(img):
     ok, buf = cv2.imencode(".jpg", img, JPEG_PARAMS)
     if not ok:
@@ -121,8 +143,7 @@ def _store_source(token, index, raw):
     if img is None:
         return None
     img = fit(img)
-    with open(_item_path(token, index, "src.jpg"), "wb") as fp:
-        fp.write(_encode_jpeg(img))
+    _write_atomic(_item_path(token, index, "src.jpg"), _encode_jpeg(img))
     h, w = img.shape[:2]
     return w, h
 
@@ -172,6 +193,7 @@ def index():
     return render_template("index.html", styles=STYLE_INFO,
                            max_upload_mb=MAX_UPLOAD_MB,
                            max_batch_files=MAX_BATCH_FILES,
+                           concurrency=CONCURRENCY,
                            min_colors=MIN_COLORS, max_colors=MAX_COLORS)
 
 
@@ -268,8 +290,7 @@ def transform():
         img = cv2.imread(src)
         if img is None:
             return jsonify(error="이미지를 읽지 못했습니다."), 500
-        with open(out_path, "wb") as fp:
-            fp.write(_encode_jpeg(apply_style(img, style, colors)))
+        _write_atomic(out_path, _encode_jpeg(apply_style(img, style, colors)))
 
     return jsonify(style=style, colors=colors, index=index,
                    url=_result_url(token, index, style, colors),
@@ -368,6 +389,7 @@ def _json_error(err):
     return render_template("index.html", styles=STYLE_INFO,
                            max_upload_mb=MAX_UPLOAD_MB,
                            max_batch_files=MAX_BATCH_FILES,
+                           concurrency=CONCURRENCY,
                            min_colors=MIN_COLORS,
                            max_colors=MAX_COLORS), err.code
 

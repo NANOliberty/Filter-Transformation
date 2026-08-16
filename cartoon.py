@@ -26,8 +26,11 @@ KMEANS_CRITERIA = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0)
 KMEANS_SAMPLE = 80000     # 중심을 학습할 때 쓰는 최대 픽셀 수
 MEANSHIFT_SIDE = 700      # 평균이동 필터를 돌릴 최대 해상도
 HALFTONE_PITCH = 150      # 긴 변을 이 값으로 나눈 만큼이 망점 한 칸
+SKETCH_SIGMA_DIV = 120    # 긴 변을 이 값으로 나눈 만큼이 연필 획 굵기
 PENCIL_TONE = 0.30        # 연필 음영의 진하기 (0이면 흰 여백만 남는다)
-CRAYON_PAPER = 0.25       # 색연필 색을 종이 쪽으로 옅게 미는 정도
+PENCIL_INK = 2.0          # 연필 획을 진하게 하는 배수
+CRAYON_INK = 3.5          # 색연필 획을 진하게 하는 배수
+CRAYON_PAPER = 0.22       # 색연필 색을 종이 쪽으로 옅게 미는 정도
 NEON_EDGE_KEEP = 0.06     # 네온에서 선으로 살릴 상위 그라디언트 비율
 PIXEL_CELLS = 140         # 픽셀 스타일의 가로 칸 수
 
@@ -97,16 +100,26 @@ def style_ink(img, colors=None):
 
 
 def _sketch_layers(img):
-    """연필 계열이 함께 쓰는 밑작업 — 평활화한 원본과 0~255 스케치.
+    """연필 계열이 함께 쓰는 밑작업 — 평활화한 원본과 0~1 스케치.
 
-    pencilSketch는 국소 대비를 키우는 필터라 잔결이 있는 하늘·잔디에서
-    필름 노이즈까지 연필선으로 둔갑시킨다. 미리 살짝 눌러 두면
-    윤곽은 남고 잡티만 사라진다.
+    예전에는 cv2.pencilSketch를 썼는데, 나뭇잎이나 잔디처럼 잔결이 촘촘한
+    곳에서 획이 겹쳐 새까맣게 뭉쳤다. 지금은 흑백을 뒤집어 흐린 것으로
+    나누는 닷지 기법을 쓴다. 밝기 차가 생긴 자리에만 획이 남아서
+    아무리 결이 촘촘해도 검게 메워지지 않는다.
     """
     smooth = cv2.bilateralFilter(img, 9, 60, 60)
-    gray, _ = cv2.pencilSketch(smooth, sigma_s=60, sigma_r=0.07,
-                               shade_factor=0.02)
-    return smooth, gray.astype(np.float32)
+    gray = cv2.cvtColor(smooth, cv2.COLOR_BGR2GRAY).astype(np.float32)
+
+    # 획 굵기가 해상도를 따라가도록 흐림 반경을 사진 크기에 비례시킨다.
+    sigma = max(3.0, max(img.shape[:2]) / SKETCH_SIGMA_DIV)
+    blur = cv2.GaussianBlur(255.0 - gray, (0, 0), sigma)
+    sketch = gray * 255.0 / np.maximum(255.0 - blur, 1.0)
+    return smooth, np.clip(sketch, 0, 255) / 255.0
+
+
+def _ink(sketch, amount):
+    """그은 자리만 골라 진하게 만든다. 흰 여백은 그대로 둔다."""
+    return np.clip(1.0 - (1.0 - sketch) * amount, 0.0, 1.0)
 
 
 def style_pencil(img, colors=None):
@@ -119,7 +132,7 @@ def style_pencil(img, colors=None):
                            (0, 0), 3).astype(np.float32)
     tone = 255.0 - (255.0 - lum) * PENCIL_TONE
 
-    out = np.clip(sketch * tone / 255.0, 0, 255).astype(np.uint8)
+    out = np.clip(_ink(sketch, PENCIL_INK) * tone, 0, 255).astype(np.uint8)
     return cv2.cvtColor(out, cv2.COLOR_GRAY2BGR)
 
 
@@ -128,11 +141,11 @@ def style_crayon(img, colors=None):
     smooth, sketch = _sketch_layers(img)
 
     hsv = cv2.cvtColor(smooth, cv2.COLOR_BGR2HSV).astype(np.float32)
-    hsv[..., 1] = np.clip(hsv[..., 1] * 1.3, 0, 255)
+    hsv[..., 1] = np.clip(hsv[..., 1] * 1.35, 0, 255)
     color = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR).astype(np.float32)
     color = color * (1 - CRAYON_PAPER) + 255.0 * CRAYON_PAPER  # 종이 쪽으로 옅게
 
-    out = color * (sketch / 255.0)[..., None]
+    out = color * _ink(sketch, CRAYON_INK)[..., None]
     return np.clip(out, 0, 255).astype(np.uint8)
 
 

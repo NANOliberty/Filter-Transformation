@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+cartoon_out/
+.DS_Store
+*.log

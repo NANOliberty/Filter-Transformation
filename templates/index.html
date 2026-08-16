@@ -7,7 +7,7 @@
 <meta name="description" content="사진을 올리면 열 가지 만화풍 스타일로 바꿔 줍니다.">
 <meta name="color-scheme" content="light">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎨</text></svg>">
-<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ asset('css/style.css') }}">
 </head>
 <body>
 
@@ -182,6 +182,6 @@
     styles: {{ styles | tojson }}
   };
 </script>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ asset('js/main.js') }}"></script>
 </body>
 </html>

@@ -53,6 +53,9 @@ ENABLED = _enabled_styles()
 # 화면에 보일 순서는 STYLE_INFO의 순서를 따른다.
 ENABLED_INFO = [s for s in STYLE_INFO if s["key"] in ENABLED]
 
+# 전부 보여주는 화면에서 "이거 하나만 빠르게"로 안내할 스타일.
+QUICK_STYLE = os.environ.get("CARTOON_QUICK_STYLE", "poster")
+
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 os.makedirs(WORK_DIR, exist_ok=True)
@@ -211,13 +214,38 @@ def _assets():
 # -------------------------------------------------------------------- 라우트
 
 
+def _shown_styles(raw):
+    """주소의 styles= 에 적힌 것만 화면에 올린다.
+
+    서버가 켜 둔 것 중에서만 고른다. 비어 있거나 알아볼 수 없는 값뿐이면
+    켜 둔 것을 전부 보여준다. 화면에 무엇을 그릴지만 정하는 값이라,
+    이걸로 꺼 둔 스타일을 되살릴 수는 없다.
+    """
+    picked = {s.strip() for s in raw.split(",") if s.strip()}
+    shown = [s for s in ENABLED_INFO if s["key"] in picked]
+    return shown or ENABLED_INFO
+
+
+def _page(status=None):
+    shown = _shown_styles(request.args.get("styles", ""))
+    quick = next((s for s in ENABLED_INFO if s["key"] == QUICK_STYLE), None)
+
+    html = render_template(
+        "index.html", styles=shown,
+        total_styles=len(ENABLED_INFO),
+        subset=len(shown) < len(ENABLED_INFO),
+        # 전부 보이는 중이고 줄여 볼 만한 스타일이 있을 때만 지름길을 권한다.
+        quick=quick if (quick and len(ENABLED_INFO) > 1
+                        and len(shown) == len(ENABLED_INFO)) else None,
+        max_upload_mb=MAX_UPLOAD_MB, max_batch_files=MAX_BATCH_FILES,
+        concurrency=CONCURRENCY,
+        min_colors=MIN_COLORS, max_colors=MAX_COLORS)
+    return (html, status) if status else html
+
+
 @app.get("/")
 def index():
-    return render_template("index.html", styles=ENABLED_INFO,
-                           max_upload_mb=MAX_UPLOAD_MB,
-                           max_batch_files=MAX_BATCH_FILES,
-                           concurrency=CONCURRENCY,
-                           min_colors=MIN_COLORS, max_colors=MAX_COLORS)
+    return _page()
 
 
 @app.get("/healthz")
@@ -447,12 +475,7 @@ def _json_error(err):
     desc = getattr(err, "description", "요청을 처리하지 못했습니다.")
     if request.path.startswith("/api/"):
         return jsonify(error=desc), err.code
-    return render_template("index.html", styles=ENABLED_INFO,
-                           max_upload_mb=MAX_UPLOAD_MB,
-                           max_batch_files=MAX_BATCH_FILES,
-                           concurrency=CONCURRENCY,
-                           min_colors=MIN_COLORS,
-                           max_colors=MAX_COLORS), err.code
+    return _page(err.code)
 
 
 @app.errorhandler(413)

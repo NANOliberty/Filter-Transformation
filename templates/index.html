@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>만화 필터 · 사진을 만화처럼</title>
-<meta name="description" content="사진을 올리면 열 가지 만화풍 스타일로 바꿔 줍니다.">
+<meta name="description" content="{% if styles | length == 1 %}사진을 올리면 {{ styles[0].label }} 그림풍으로 바꿔 줍니다.{% else %}사진을 올리면 {{ styles | length }}가지 만화풍 스타일로 바꿔 줍니다.{% endif %}">
 <meta name="color-scheme" content="light">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎨</text></svg>">
 <link rel="stylesheet" href="{{ asset('css/style.css') }}">
@@ -21,6 +21,11 @@
         사진 한 장을 {{ styles | length }}가지로 비교하거나, 여러 장을 한 번에 바꿔 드려요.
       {%- endif -%}
     </p>
+    {%- if subset %}
+    <p class="switch"><a href="{{ url_for('index') }}">{{ total_styles }}가지 스타일 전부 보기 →</a></p>
+    {%- elif quick %}
+    <p class="switch"><a href="{{ url_for('index', styles=quick.key) }}">{{ quick.label }} 하나만 빠르게 →</a></p>
+    {%- endif %}
   </div>
 </header>
 

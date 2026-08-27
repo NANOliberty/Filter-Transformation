@@ -81,6 +81,17 @@ body {
 
 .tagline { margin: 10px 0 0; color: var(--muted); font-size: 16px; }
 
+.switch { margin: 8px 0 0; font-size: 13.5px; }
+
+.switch a {
+  color: var(--accent-ink);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.switch a:hover { border-bottom-color: var(--accent-ink); }
+
 .site-footer {
   margin: 56px 0 40px;
   text-align: center;

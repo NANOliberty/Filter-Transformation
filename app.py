@@ -13,7 +13,8 @@ import numpy as np
 from flask import (Flask, abort, jsonify, request, send_file, render_template,
                    url_for)
 
-from cartoon import STYLE_INFO, STYLES, apply_style, fit, normalize_colors
+from cartoon import (MAX_SIDE, STYLE_INFO, STYLES, apply_style, fit,
+                     normalize_colors)
 
 MAX_UPLOAD_MB = int(os.environ.get("CARTOON_MAX_UPLOAD_MB", "16"))
 MAX_AGE_SECONDS = int(os.environ.get("CARTOON_MAX_AGE_SECONDS", "3600"))
@@ -29,6 +30,31 @@ JPEG_PARAMS = [cv2.IMWRITE_JPEG_QUALITY, 95]
 
 TOKEN_RE = re.compile(r"^[0-9a-f]{32}$")
 MIN_COLORS, MAX_COLORS = 3, 32
+
+def _enabled_styles():
+    """켤 스타일 목록. CARTOON_STYLES가 비어 있으면 전부 켠다.
+
+    CPU가 빠듯한 곳에서는 한둘만 켜서 서버가 할 일을 줄인다.
+    화면도 켜진 만큼만 그려진다.
+    """
+    raw = os.environ.get("CARTOON_STYLES", "").strip()
+    if not raw:
+        return list(STYLES)
+
+    picked = [s.strip() for s in raw.split(",") if s.strip()]
+    unknown = [s for s in picked if s not in STYLES]
+    if unknown:
+        raise SystemExit(f"CARTOON_STYLES에 알 수 없는 스타일: {', '.join(unknown)}\n"
+                         f"쓸 수 있는 값: {', '.join(STYLES)}")
+    return picked or list(STYLES)
+
+
+ENABLED = _enabled_styles()
+# 화면에 보일 순서는 STYLE_INFO의 순서를 따른다.
+ENABLED_INFO = [s for s in STYLE_INFO if s["key"] in ENABLED]
+
+# 전부 보여주는 화면에서 "이거 하나만 빠르게"로 안내할 스타일.
+QUICK_STYLE = os.environ.get("CARTOON_QUICK_STYLE", "poster")
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
@@ -188,18 +214,81 @@ def _assets():
 # -------------------------------------------------------------------- 라우트
 
 
+def _shown_styles(raw):
+    """주소의 styles= 에 적힌 것만 화면에 올린다.
+
+    서버가 켜 둔 것 중에서만 고른다. 비어 있거나 알아볼 수 없는 값뿐이면
+    켜 둔 것을 전부 보여준다. 화면에 무엇을 그릴지만 정하는 값이라,
+    이걸로 꺼 둔 스타일을 되살릴 수는 없다.
+    """
+    picked = {s.strip() for s in raw.split(",") if s.strip()}
+    shown = [s for s in ENABLED_INFO if s["key"] in picked]
+    return shown or ENABLED_INFO
+
+
+def _page(status=None):
+    shown = _shown_styles(request.args.get("styles", ""))
+    quick = next((s for s in ENABLED_INFO if s["key"] == QUICK_STYLE), None)
+
+    html = render_template(
+        "index.html", styles=shown,
+        total_styles=len(ENABLED_INFO),
+        subset=len(shown) < len(ENABLED_INFO),
+        # 전부 보이는 중이고 줄여 볼 만한 스타일이 있을 때만 지름길을 권한다.
+        quick=quick if (quick and len(ENABLED_INFO) > 1
+                        and len(shown) == len(ENABLED_INFO)) else None,
+        max_upload_mb=MAX_UPLOAD_MB, max_batch_files=MAX_BATCH_FILES,
+        concurrency=CONCURRENCY,
+        min_colors=MIN_COLORS, max_colors=MAX_COLORS)
+    return (html, status) if status else html
+
+
 @app.get("/")
 def index():
-    return render_template("index.html", styles=STYLE_INFO,
-                           max_upload_mb=MAX_UPLOAD_MB,
-                           max_batch_files=MAX_BATCH_FILES,
-                           concurrency=CONCURRENCY,
-                           min_colors=MIN_COLORS, max_colors=MAX_COLORS)
+    return _page()
 
 
 @app.get("/healthz")
 def healthz():
     return jsonify(ok=True)
+
+
+@app.get("/api/speed")
+def speed():
+    """이 서버가 얼마나 빠른지 재서 알려준다.
+
+    배포한 곳이 느릴 때, 원인이 CPU인지 아닌지부터 가른다. 업로드 없이
+    고정된 그림을 만들어 돌리므로 결과를 서로 비교할 수 있다.
+    기준값은 코어 하나를 온전히 쓰는 기계에서 잰 것이다.
+    """
+    # 코어 하나를 온전히 쓰는 기계에서 600×600을 돌렸을 때의 값(ms)
+    reference = {"poster": 145, "oil": 125, "pencil": 25}
+
+    yy, xx = np.mgrid[0:600, 0:600].astype(np.float32)
+    board = np.stack([(xx * 0.4) % 256, (yy * 0.3) % 256,
+                      ((xx + yy) * 0.2) % 256], axis=-1).astype(np.uint8)
+    board = cv2.GaussianBlur(board, (0, 0), 1.5)
+
+    # 첫 회에는 메모리 확보 같은 준비 비용이 섞이므로 두 번 돌려 뒤엣것을 쓴다.
+    measured, total = {}, 0.0
+    for style in reference:
+        apply_style(board, style)
+        started = time.time()
+        apply_style(board, style)
+        ms = (time.time() - started) * 1000
+        measured[style] = round(ms)
+        total += ms
+
+    slowdown = total / sum(reference.values())
+    return jsonify(
+        측정=measured,
+        기준=reference,
+        합계ms=round(total),
+        배수=round(slowdown, 1),
+        판정=("빠름 — CPU는 문제가 아닙니다" if slowdown < 1.5 else
+              "보통 — 조금 느린 CPU입니다" if slowdown < 3 else
+              f"느림 — 기준의 {slowdown:.0f}배. CPU가 부족한 곳입니다"),
+        해상도=MAX_SIDE, 동시변환=CONCURRENCY)
 
 
 @app.post("/api/upload")
@@ -270,8 +359,8 @@ def transform():
     data = request.get_json(silent=True) or {}
     token = _check_token(str(data.get("token", "")))
     style = str(data.get("style", ""))
-    if style not in STYLES:
-        return jsonify(error="알 수 없는 스타일입니다."), 400
+    if style not in ENABLED:
+        return jsonify(error="이 서버에서 켜 두지 않은 스타일입니다."), 400
 
     colors = normalize_colors(style, _parse_colors(data.get("colors")))
     meta = _meta(token)
@@ -308,7 +397,7 @@ def image_src(token, index):
 @app.get("/api/image/<token>/<int:index>/<style>/<int:colors>")
 def image_result(token, index, style, colors):
     _check_token(token)
-    if style not in STYLES:
+    if style not in ENABLED:
         abort(404)
     if colors and not (MIN_COLORS <= colors <= MAX_COLORS):
         abort(404)
@@ -332,10 +421,10 @@ def download_zip(token):
     wanted = _parse_colors(request.args.get("colors"))
 
     styles = [s for s in request.args.get("styles", "").split(",") if s]
-    unknown = [s for s in styles if s not in STYLES]
+    unknown = [s for s in styles if s not in ENABLED]
     if unknown:
         abort(400, description="알 수 없는 스타일입니다.")
-    styles = styles or list(STYLES)
+    styles = styles or list(ENABLED)
 
     # 파일 이름이 겹치면 앞에 번호를 붙여 서로 덮어쓰지 않게 한다.
     counts = {}
@@ -386,12 +475,7 @@ def _json_error(err):
     desc = getattr(err, "description", "요청을 처리하지 못했습니다.")
     if request.path.startswith("/api/"):
         return jsonify(error=desc), err.code
-    return render_template("index.html", styles=STYLE_INFO,
-                           max_upload_mb=MAX_UPLOAD_MB,
-                           max_batch_files=MAX_BATCH_FILES,
-                           concurrency=CONCURRENCY,
-                           min_colors=MIN_COLORS,
-                           max_colors=MAX_COLORS), err.code
+    return _page(err.code)
 
 
 @app.errorhandler(413)

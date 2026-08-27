@@ -341,12 +341,17 @@
     var state = { token: null, items: [], colors: 0, busy: false, run: 0 };
 
     function selectedStyles() {
-      return $$(".chip.on", chips).map(function (c) { return c.dataset.style; });
+      var picked = $$(".chip.on", chips).map(function (c) { return c.dataset.style; });
+      if (picked.length) return picked;
+      // 스타일이 하나뿐이라 선택기를 숨긴 경우 — 켜져 있는 것을 그대로 쓴다.
+      return (cfg.styles || []).map(function (s) { return s.key; });
     }
 
     function isTunable(style) {
       var chip = $('.chip[data-style="' + style + '"]', chips);
-      return chip && chip.dataset.tunable === "1";
+      if (chip) return chip.dataset.tunable === "1";
+      var info = (cfg.styles || []).filter(function (s) { return s.key === style; })[0];
+      return !!(info && info.tunable);
     }
 
     function refreshRunButton() {
